@@ -39,7 +39,7 @@ public class PackedBase64Offsets {
         for (int offset : offsets) {
             int n = offset < 0 ? -offset : offset;
 
-            if (n < 63) {
+            if (n < 64) {
                 sb.append(base64Digits.charAt(n));
             } else {
                 sb.append('[');
