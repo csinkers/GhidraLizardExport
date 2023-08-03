@@ -108,9 +108,7 @@ public class LizardPrettyPrinter {
 		long baseOffset = function.getEntryPoint().getOffset();
 		sb.append("//!L! ");
 		sb.append(String.format("%08x", baseOffset));
-		sb.append(" [");
-		sb.append(function.getName());
-		sb.append("] ");
+		sb.append(" ");
 
 		int[] minima = new int[lines.size()];
 
