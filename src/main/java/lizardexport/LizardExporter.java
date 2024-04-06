@@ -276,9 +276,17 @@ public class LizardExporter extends Exporter {
 			ClangTokenGroup docroot = dr.getCCodeMarkup();
 			LizardPrettyPrinter printer = new LizardPrettyPrinter(dr.getFunction(), docroot);
 			String offsetsLine = printer.getOffsetsLine();
+			String baseOffsetLine = printer.getBaseOffsetLine();
 			DecompiledFunction decompiledFunction = printer.print(true);
 
-			return new CPPResult(entryPoint, offsetsLine + System.lineSeparator() + decompiledFunction.getC());
+			var result = offsetsLine + System.lineSeparator();
+
+			if (baseOffsetLine != null)
+				result += baseOffsetLine + System.lineSeparator();
+
+			result += decompiledFunction.getC();
+
+			return new CPPResult(entryPoint, result);
 		}
 	}
 
