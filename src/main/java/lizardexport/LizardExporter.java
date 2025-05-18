@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -55,17 +55,21 @@ public class LizardExporter extends Exporter {
 	/**
 	 * Exporter constructor.
 	 */
-	public LizardExporter() 
+	public LizardExporter()
 	{
 		super("C for Lizard Debugger", "c", null); // Name & extension
 	}
 
 	@Override
-	public boolean export(File file, DomainObject domainObj, AddressSetView addrSet,
-			TaskMonitor monitor) throws IOException, ExporterException 
+	public boolean export(
+			File file,
+			DomainObject domainObj,
+			AddressSetView addrSet,
+			TaskMonitor monitor
+		) throws IOException, ExporterException
 	{
 		if (!(domainObj instanceof Program)) {
-			log.appendMsg("Unsupported type: " + domainObj.getClass().getName());
+			log.appendMsg("Unsupported type: " + domainObj.getClass().getName() + ", expected 'Program'");
 			return false;
 		}
 
@@ -104,10 +108,13 @@ public class LizardExporter extends Exporter {
 	@Override public List<Option> getOptions(DomainObjectService domainObjectService) { return new ArrayList<>(); }
 	@Override public void setOptions(List<Option> options) throws OptionException { }
 
-	private void decompileAndExport(AddressSetView addrSet, Program program,
-			PrintWriter cFileWriter, ChunkingParallelDecompiler<CPPResult> parallelDecompiler,
-			ChunkingTaskMonitor chunkingMonitor)
-			throws InterruptedException, Exception, CancelledException 
+	private void decompileAndExport(
+			AddressSetView addrSet,
+			Program program,
+			PrintWriter cFileWriter,
+			ChunkingParallelDecompiler<CPPResult> parallelDecompiler,
+			ChunkingTaskMonitor chunkingMonitor
+		) throws InterruptedException, Exception, CancelledException
 	{
 		int functionCount = program.getFunctionManager().getFunctionCount();
 		chunkingMonitor.doInitialize(functionCount);
@@ -134,7 +141,11 @@ public class LizardExporter extends Exporter {
 		writeResults(results, cFileWriter, chunkingMonitor);
 	}
 
-	private void writeResults(List<CPPResult> results, PrintWriter cFileWriter, TaskMonitor monitor) throws CancelledException
+	private void writeResults(
+			List<CPPResult> results,
+			PrintWriter cFileWriter,
+			 TaskMonitor monitor
+		 ) throws CancelledException
 	{
 		monitor.checkCanceled();
 
@@ -197,7 +208,6 @@ public class LizardExporter extends Exporter {
 		public int compareTo(CPPResult other) {
 			return address.compareTo(other.address);
 		}
-
 	}
 
 	private class DecompilerFactory extends CountingBasicFactory<DecompInterface> {
@@ -213,7 +223,7 @@ public class LizardExporter extends Exporter {
 			DecompInterface decompiler = new DecompInterface();
 			decompiler.setOptions(options);
 			decompiler.openProgram(program);
-            // Note: the default exporter disables the syntax tree, but we need it for getting the address mapping
+			// Note: the default exporter disables the syntax tree, but we need it for getting the address mapping
 			return decompiler;
 		}
 
@@ -247,7 +257,7 @@ public class LizardExporter extends Exporter {
 			}
 		}
 
-		private CPPResult doWork(Function function, DecompInterface decompiler, TaskMonitor monitor) {
+		private CPPResult doWork(Function function, DecompInterface decompiler, TaskMonitor monitor) throws CancelledException {
 			Address entryPoint = function.getEntryPoint();
 			CodeUnit codeUnitAt = function.getProgram().getListing().getCodeUnitAt(entryPoint);
 			if (codeUnitAt == null || !(codeUnitAt instanceof Instruction)) {
@@ -275,15 +285,10 @@ public class LizardExporter extends Exporter {
 
 			ClangTokenGroup docroot = dr.getCCodeMarkup();
 			LizardPrettyPrinter printer = new LizardPrettyPrinter(dr.getFunction(), docroot);
-			String offsetsLine = printer.getOffsetsLine();
-			String baseOffsetLine = printer.getBaseOffsetLine();
+			String metaDataLine = printer.getMetadataLine(monitor);
 			DecompiledFunction decompiledFunction = printer.print(true);
 
-			var result = offsetsLine + System.lineSeparator();
-
-			if (baseOffsetLine != null)
-				result += baseOffsetLine + System.lineSeparator();
-
+			var result = metaDataLine + System.lineSeparator();
 			result += decompiledFunction.getC();
 
 			return new CPPResult(entryPoint, result);
@@ -292,7 +297,7 @@ public class LizardExporter extends Exporter {
 
 	/**
 	 * A class that exists because we are doing something that the ConcurrentQ was not
-	 * designed for--chunking.  We do not want out monitor being reset every time we start a new
+	 * designed for: chunking. We do not want out monitor being reset every time we start a new
 	 * chunk. So, we wrap a real monitor, overriding the behavior such that initialize() has
 	 * no effect when it is called by the queue.
 	 */
@@ -301,10 +306,10 @@ public class LizardExporter extends Exporter {
 
 		ChunkingTaskMonitor(TaskMonitor monitor) { this.monitor = monitor; }
 		void doInitialize(long value) { monitor.initialize(value); } // this lets us initialize when we want to
-		@Override public void setProgress(long value) { monitor.setProgress(value); } 
-		@Override public void checkCanceled() throws CancelledException { monitor.checkCanceled(); } 
-		@Override public void setMessage(String message) { monitor.setMessage(message); } 
-		@Override public synchronized void addCancelledListener(CancelledListener listener) { monitor.addCancelledListener(listener); } 
+		@Override public void setProgress(long value) { monitor.setProgress(value); }
+		@Override public void checkCanceled() throws CancelledException { monitor.checkCanceled(); }
+		@Override public void setMessage(String message) { monitor.setMessage(message); }
+		@Override public synchronized void addCancelledListener(CancelledListener listener) { monitor.addCancelledListener(listener); }
 		@Override public synchronized void removeCancelledListener(CancelledListener listener) { monitor.removeCancelledListener(listener); }
 	}
 }

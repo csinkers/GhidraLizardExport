@@ -5,13 +5,15 @@ import java.util.List;
 
 import ghidra.app.decompiler.*;
 import ghidra.app.decompiler.component.DecompilerUtils;
+import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
+import ghidra.program.model.block.*;
 import ghidra.program.model.lang.OperandType;
-import ghidra.program.model.listing.Function;
-import ghidra.program.model.listing.Instruction;
-import ghidra.program.model.listing.InstructionIterator;
-import ghidra.program.model.listing.Listing;
+import ghidra.program.model.listing.*;
+import ghidra.program.model.symbol.FlowType;
 import ghidra.util.StringUtilities;
+import ghidra.util.exception.CancelledException;
+import ghidra.util.task.TaskMonitor;
 
 /**
  * This class is used to convert a C language
@@ -105,28 +107,30 @@ public class LizardPrettyPrinter {
 		return new DecompiledFunction(findSignature(), buff.toString());
 	}
 
-	public String getOffsetsLine() {
+	public String getMetadataLine(TaskMonitor monitor) throws CancelledException {
 		StringBuffer sb = new StringBuffer();
 		long baseOffset = function.getEntryPoint().getOffset();
-		sb.append("//!L! ");
+		sb.append("//!M! ");
 		sb.append(String.format("%08x", baseOffset));
-		sb.append(" ");
+		sb.append(';');
 
+		// Line offsets
 		int[] minima = new int[lines.size()];
 
+		// Find the minimum address for each line of code so we can build a mapping of address intervals to line numbers.
 		for (int i = 0; i < lines.size(); i++) {
-			var line = lines.get(i);
+			ClangLine line = lines.get(i);
 			List<ClangToken> tokens = line.getAllTokens();
 			long min = Long.MAX_VALUE;
 			long max = 0;
 
 			for (ClangToken token : tokens) {
-				var tminAddr = token.getMinAddress();
-				var tmaxAddr = token.getMaxAddress();
+				Address tminAddr = token.getMinAddress();
+				Address tmaxAddr = token.getMaxAddress();
 				if (tminAddr == null || tmaxAddr == null) continue;
 
-				var tmin = tminAddr.getOffset();
-				var tmax = tmaxAddr.getOffset();
+				long tmin = tminAddr.getOffset();
+				long tmax = tmaxAddr.getOffset();
 				if (tmin < min) min = tmin;
 				if (tmax > max) max = tmax;
 			}
@@ -137,8 +141,24 @@ public class LizardPrettyPrinter {
 				: (int)(i > 0 ? minima[i-1] : baseOffset);
 		}
 
+		// Convert it to a compact base64 representation
 		int[] offsets = PackedBase64Offsets.ConvertToOffsets((int)baseOffset, minima);
 		sb.append(PackedBase64Offsets.Encode(offsets));
+		sb.append(';');
+
+		// Stack offset
+		Integer stackOffset = getStackOffset();
+		if (stackOffset != null) {
+			sb.append(Integer.toString(stackOffset, 16));
+		}
+
+		sb.append(';');
+
+		// Exit point offsets
+		int[] exitPoints = getExitPoints();
+		offsets = PackedBase64Offsets.ConvertToOffsets((int)baseOffset, exitPoints);
+		sb.append(PackedBase64Offsets.Encode(offsets));
+
 		return sb.toString();
 	}
 
@@ -149,15 +169,15 @@ public class LizardPrettyPrinter {
 		return 4;
 	}
 
-	Integer getBaseOffset() {
+	Integer getStackOffset() {
 		int stackOffset = 0;
 		AddressSetView body = function.getBody();
 		Listing listing = function.getProgram().getListing();
 		InstructionIterator iterator = listing.getInstructions(body, true);
 
 		for (Instruction instruction : iterator) {
-			var asString = instruction.toString();
-			var mnemonic = instruction.getMnemonicString();
+			String asString = instruction.toString();
+			String mnemonic = instruction.getMnemonicString();
 			switch (mnemonic)
 			{
 			case "PUSH":
@@ -216,14 +236,22 @@ public class LizardPrettyPrinter {
 		 */
 	}
 
-	public String getBaseOffsetLine() {
-		Integer baseOffset = getBaseOffset();
-		if (baseOffset == null)
-			return null;
+	int[] getExitPoints() {
+		AddressSetView body = function.getBody();
+		Listing listing = function.getProgram().getListing();
 
-		StringBuffer sb = new StringBuffer();
-		sb.append("//!B! " + baseOffset.toString());
-		return sb.toString();
+		ArrayList<Long> exits = new ArrayList<Long>();
+		for (Instruction instruction : listing.getInstructions(body, true)) {
+			if (instruction.getFlowType().isTerminal()) { // check for RET etc
+				exits.add(instruction.getAddress().getOffset());
+			}
+		}
+
+		int[] asArray = new int[exits.size()];
+		for (int i = 0; i < asArray.length; i++)
+			asArray[i] = exits.get(i).intValue();
+
+		return asArray;
 	}
 
 	private String findSignature() {
