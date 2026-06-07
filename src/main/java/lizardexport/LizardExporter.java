@@ -257,7 +257,7 @@ public class LizardExporter extends Exporter {
 			}
 		}
 
-		private CPPResult doWork(Function function, DecompInterface decompiler, TaskMonitor monitor) throws CancelledException {
+		private CPPResult doWork(Function function, DecompInterface decompiler, TaskMonitor monitor) {
 			Address entryPoint = function.getEntryPoint();
 			CodeUnit codeUnitAt = function.getProgram().getListing().getCodeUnitAt(entryPoint);
 			if (codeUnitAt == null || !(codeUnitAt instanceof Instruction)) {
@@ -285,10 +285,9 @@ public class LizardExporter extends Exporter {
 
 			ClangTokenGroup docroot = dr.getCCodeMarkup();
 			LizardPrettyPrinter printer = new LizardPrettyPrinter(dr.getFunction(), docroot);
-			String metaDataLine = printer.getMetadataLine(monitor);
 			DecompiledFunction decompiledFunction = printer.print(true);
 
-			var result = metaDataLine + System.lineSeparator();
+			var result = printer.getMetadataLine() + System.lineSeparator();
 			result += decompiledFunction.getC();
 
 			return new CPPResult(entryPoint, result);

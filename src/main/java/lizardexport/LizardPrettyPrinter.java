@@ -7,13 +7,9 @@ import ghidra.app.decompiler.*;
 import ghidra.app.decompiler.component.DecompilerUtils;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
-import ghidra.program.model.block.*;
 import ghidra.program.model.lang.OperandType;
 import ghidra.program.model.listing.*;
-import ghidra.program.model.symbol.FlowType;
 import ghidra.util.StringUtilities;
-import ghidra.util.exception.CancelledException;
-import ghidra.util.task.TaskMonitor;
 
 /**
  * This class is used to convert a C language
@@ -107,11 +103,14 @@ public class LizardPrettyPrinter {
 		return new DecompiledFunction(findSignature(), buff.toString());
 	}
 
-	public String getMetadataLine(TaskMonitor monitor) throws CancelledException {
+	public String getMetadataLine() {
+		// Format: !M! {baseOffset:hex};{name};{lineOffsets:base64};{stackOffset:hex};{exitPoints:base64}
 		StringBuffer sb = new StringBuffer();
 		long baseOffset = function.getEntryPoint().getOffset();
 		sb.append("//!M! ");
 		sb.append(String.format("%08x", baseOffset));
+		sb.append(';');
+		sb.append(function.getName());
 		sb.append(';');
 
 		// Line offsets
