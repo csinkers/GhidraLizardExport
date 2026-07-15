@@ -1,3 +1,18 @@
+/* ###
+ * IP: GHIDRA
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package lizardexport;
 
 import java.util.ArrayList;
@@ -8,99 +23,110 @@ import ghidra.app.decompiler.component.DecompilerUtils;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.lang.OperandType;
+import ghidra.program.model.symbol.IdentityNameTransformer;
+import ghidra.program.model.symbol.NameTransformer;
 import ghidra.program.model.listing.*;
 import ghidra.util.StringUtilities;
 
 /**
- * This class is used to convert a C language
- * token group into readable C code.
+ * This class is used to convert a C/C++ language token group into readable C/C++ code.
  */
 public class LizardPrettyPrinter {
-	/**
-	 * The indent string to use when printing.
-	 */
+
+	private final static NameTransformer IDENTITY = new IdentityNameTransformer();
+
 	public final static String INDENT_STRING = " ";
 
 	private Function function;
 	private ClangTokenGroup tokgroup;
-	private ArrayList<ClangLine> lines = new ArrayList<ClangLine>();
+	private List<ClangLine> lines = new ArrayList<>();
+	private NameTransformer transformer;
 
 	/**
 	 * Constructs a new pretty printer using the specified C language token group.
+	 * The printer takes a NameTransformer that will be applied to symbols, which can replace
+	 * illegal characters in the symbol name for instance. A null indicates no transform is applied.
+	 * @param function is the function to be printed
 	 * @param tokgroup the C language token group
+	 * @param transformer the transformer to apply to symbols
 	 */
-	public LizardPrettyPrinter(Function function, ClangTokenGroup tokgroup) {
+	public LizardPrettyPrinter(Function function, ClangTokenGroup tokgroup, NameTransformer transformer) {
 		this.function = function;
 		this.tokgroup = tokgroup;
-		this.lines = DecompilerUtils.toLines(tokgroup);
+		this.transformer = transformer != null ? transformer : IDENTITY;
+		flattenLines();
+		padEmptyLines();
+	}
 
-        for (ClangLine line : lines) {
-			ArrayList<ClangToken> tokenList = line.getAllTokens();
+	private void padEmptyLines() {
+		for (ClangLine line : lines) {
+			List<ClangToken> tokenList = line.getAllTokens();
 			if (tokenList.size() == 0) {
 				ClangToken spacer = ClangToken.buildSpacer(null, line.getIndent(), INDENT_STRING);
 				spacer.setLineParent(line);
-                tokenList.add(0, spacer);
+				tokenList.add(0, spacer);
 			}
 		}
-    }
+	}
 
 	public Function getFunction() {
 		return function;
 	}
 
 	/**
-	 * Returns an array list of the C language lines contained in the
-	 * C language token group.
-	 * @return an array list of the C language lines
+	 * Returns a list of the C language lines contained in the C language token group.
+	 * @return a list of the C language lines
 	 */
-	public ArrayList<ClangLine> getLines() {
+	public List<ClangLine> getLines() {
 		return lines;
 	}
 
 	/**
-	 * Prints the C language token group
-	 * into a string of C code.
-	 * @param removeInvalidChars true if invalid character should be
-	 * removed from functions and labels.
+	 * Prints the C language token group into a string of C code.
 	 * @return a string of readable C code
 	 */
-	public DecompiledFunction print(boolean removeInvalidChars) {
-		StringBuffer buff = new StringBuffer();
-
+	public DecompiledFunction print() {
+		StringBuilder buff = new StringBuilder();
 		for (ClangLine line : lines) {
-			buff.append(line.getIndentString());
-			List<ClangToken> tokens = line.getAllTokens();
-
-			for (ClangToken token : tokens) {
-				boolean isToken2Clean = token instanceof ClangFuncNameToken ||
-										token instanceof ClangVariableToken ||
-										token instanceof ClangTypeToken ||
-										token instanceof ClangFieldToken ||
-										token instanceof ClangLabelToken;
-
-				//do not clean constant variable tokens
-				if (isToken2Clean && token.getSyntaxType() == ClangToken.CONST_COLOR) {
-					isToken2Clean = false;
-				}
-
-				if (removeInvalidChars && isToken2Clean) {
-					String tokenText = token.getText();
-					for (int i = 0 ; i < tokenText.length() ; ++i) {
-						if (StringUtilities.isValidCLanguageChar(tokenText.charAt(i))) {
-							buff.append(tokenText.charAt(i));
-						}
-						else {
-							buff.append('_');
-						}
-					}
-				}
-				else {
-					buff.append(token.getText());
-				}
-			}
+			getText(buff, line, transformer);
 			buff.append(StringUtilities.LINE_SEPARATOR);
 		}
 		return new DecompiledFunction(findSignature(), buff.toString());
+	}
+
+	private static void getText(StringBuilder buff, ClangLine line, NameTransformer transformer) {
+		buff.append(line.getIndentString());
+		List<ClangToken> tokens = line.getAllTokens();
+
+		for (ClangToken token : tokens) {
+			boolean isToken2Clean = token instanceof ClangFuncNameToken ||
+									token instanceof ClangVariableToken ||
+									token instanceof ClangTypeToken ||
+									token instanceof ClangFieldToken ||
+									token instanceof ClangLabelToken;
+
+			//do not clean constant variable tokens
+			if (isToken2Clean && token.getSyntaxType() == ClangToken.CONST_COLOR) {
+				isToken2Clean = false;
+			}
+
+			String tokenText = token.getText();
+			if (isToken2Clean) {
+				tokenText = transformer.simplify(tokenText);
+			}
+			buff.append(tokenText);
+		}
+	}
+
+	/**
+	 * Returns the text of the given line as seen in the UI.
+	 * @param line the line
+	 * @return the text
+	 */
+	public static String getText(ClangLine line) {
+		StringBuilder buff = new StringBuilder();
+		getText(buff, line, IDENTITY);
+		return buff.toString();
 	}
 
 	public String getMetadataLine() {
@@ -239,7 +265,7 @@ public class LizardPrettyPrinter {
 		AddressSetView body = function.getBody();
 		Listing listing = function.getProgram().getListing();
 
-		ArrayList<Long> exits = new ArrayList<Long>();
+		List<Long> exits = new ArrayList<Long>();
 		for (Instruction instruction : listing.getInstructions(body, true)) {
 			if (instruction.getFlowType().isTerminal()) { // check for RET etc
 				exits.add(instruction.getAddress().getOffset());
@@ -263,5 +289,8 @@ public class LizardPrettyPrinter {
 		}
 		return null;
 	}
-}
 
+	private void flattenLines() {
+		lines = DecompilerUtils.toLines(tokgroup);
+	}
+}

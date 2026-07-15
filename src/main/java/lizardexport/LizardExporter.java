@@ -34,7 +34,7 @@ import ghidra.app.util.exporter.Exporter;
 import ghidra.app.util.exporter.ExporterException;
 import ghidra.framework.model.DomainObject;
 import ghidra.framework.options.ToolOptions;
-import ghidra.framework.plugintool.util.OptionsService;
+import docking.options.OptionsService;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.listing.*;
@@ -58,6 +58,18 @@ public class LizardExporter extends Exporter {
 	public LizardExporter()
 	{
 		super("C for Lizard Debugger", "c", null); // Name & extension
+	}
+
+	@Override
+	public boolean supportsAddressRestrictedExport() {
+		// Return true if addrSet export parameter can be used to restrict export
+		return false;
+	}
+
+	@Override
+	public boolean canExportDomainObject(Class<? extends DomainObject> domainObjectClass) {
+		// return Program.class.isAssignableFrom(domainObjectClass);
+		return false;
 	}
 
 	@Override
@@ -284,8 +296,8 @@ public class LizardExporter extends Exporter {
 			}
 
 			ClangTokenGroup docroot = dr.getCCodeMarkup();
-			LizardPrettyPrinter printer = new LizardPrettyPrinter(dr.getFunction(), docroot);
-			DecompiledFunction decompiledFunction = printer.print(true);
+			LizardPrettyPrinter printer = new LizardPrettyPrinter(dr.getFunction(), docroot, null);
+			DecompiledFunction decompiledFunction = printer.print();
 
 			var result = printer.getMetadataLine() + System.lineSeparator();
 			result += decompiledFunction.getC();
