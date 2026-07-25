@@ -67,18 +67,12 @@ public class LizardExporter extends Exporter {
 	}
 
 	@Override
-	public boolean canExportDomainObject(Class<? extends DomainObject> domainObjectClass) {
-		// return Program.class.isAssignableFrom(domainObjectClass);
-		return false;
-	}
-
-	@Override
 	public boolean export(
 			File file,
 			DomainObject domainObj,
 			AddressSetView addrSet,
 			TaskMonitor monitor
-		) throws IOException, ExporterException
+		) throws ExporterException, IOException
 	{
 		if (!(domainObj instanceof Program)) {
 			log.appendMsg("Unsupported type: " + domainObj.getClass().getName() + ", expected 'Program'");
@@ -99,7 +93,7 @@ public class LizardExporter extends Exporter {
 		ChunkingParallelDecompiler<CPPResult> parallelDecompiler = ParallelDecompiler.createChunkingParallelDecompiler(callback, chunkingMonitor);
 
 		try {
-			chunkingMonitor.checkCanceled();
+			chunkingMonitor.checkCancelled();
 			decompileAndExport(addrSet, program, cFileWriter, parallelDecompiler, chunkingMonitor);
 			return true;
 		}
@@ -159,13 +153,13 @@ public class LizardExporter extends Exporter {
 			 TaskMonitor monitor
 		 ) throws CancelledException
 	{
-		monitor.checkCanceled();
+		monitor.checkCancelled();
 
 		Collections.sort(results);
 
 		StringBuilder bodies = new StringBuilder();
 		for (CPPResult result : results) {
-			monitor.checkCanceled();
+			monitor.checkCancelled();
 			if (result == null) {
 				continue;
 			}
@@ -177,7 +171,7 @@ public class LizardExporter extends Exporter {
 			}
 		}
 
-		monitor.checkCanceled();
+		monitor.checkCancelled();
 		cFileWriter.print(bodies.toString());
 	}
 
@@ -318,7 +312,7 @@ public class LizardExporter extends Exporter {
 		ChunkingTaskMonitor(TaskMonitor monitor) { this.monitor = monitor; }
 		void doInitialize(long value) { monitor.initialize(value); } // this lets us initialize when we want to
 		@Override public void setProgress(long value) { monitor.setProgress(value); }
-		@Override public void checkCanceled() throws CancelledException { monitor.checkCanceled(); }
+		@Override public void checkCancelled() throws CancelledException { monitor.checkCancelled(); }
 		@Override public void setMessage(String message) { monitor.setMessage(message); }
 		@Override public synchronized void addCancelledListener(CancelledListener listener) { monitor.addCancelledListener(listener); }
 		@Override public synchronized void removeCancelledListener(CancelledListener listener) { monitor.removeCancelledListener(listener); }
