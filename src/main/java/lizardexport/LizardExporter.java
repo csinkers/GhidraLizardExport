@@ -113,6 +113,7 @@ public class LizardExporter extends Exporter {
 
 	@Override public List<Option> getOptions(DomainObjectService domainObjectService) { return new ArrayList<>(); }
 	@Override public void setOptions(List<Option> options) throws OptionException { }
+    @Override public boolean canExportDomainObject(Class<? extends DomainObject> domainObjectClass) { return false; }
 
 	private void decompileAndExport(
 			AddressSetView addrSet,
