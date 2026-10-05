@@ -3,4 +3,5 @@ bin/
 build/
 dist/
 .settings
+.env
 
